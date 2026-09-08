@@ -67,6 +67,36 @@ class TaskController extends Controller
                 }
             )
             ->when(
+                $request->filled('due_status'),
+                function ($query) use ($request) {
+
+                    if ($request->due_status === 'overdue') {
+
+                        $query
+                            ->whereNotNull('due_date')
+                            ->whereDate('due_date', '<', today())
+                            ->where('status', '!=', 'completed');
+
+                    }
+
+                    if ($request->due_status === 'due_soon') {
+
+                        $query
+                            ->whereNotNull('due_date')
+                            ->whereBetween(
+                                'due_date',
+                                [
+                                    today(),
+                                    today()->copy()->addDays(3),
+                                ]
+                            )
+                            ->where('status', '!=', 'completed');
+
+                    }
+
+                }
+            )
+            ->when(
                 $user->hasRole('Admin')
                 && $request->filled('assigned_to'),
                 function ($query) use ($request) {
@@ -75,6 +105,24 @@ class TaskController extends Controller
                         $request->assigned_to
                     );
 
+                }
+            )
+            ->when(
+            $request->boolean('overdue'),
+                function ($query) {
+
+                    $query
+                        ->whereNotNull('due_date')
+                        ->whereDate(
+                            'due_date',
+                            '<',
+                            now()->toDateString()
+                        )
+                        ->where(
+                            'status',
+                            '!=',
+                            'completed'
+                        );
                 }
             )
             ->latest()

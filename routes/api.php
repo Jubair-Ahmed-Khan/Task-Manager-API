@@ -24,4 +24,5 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('tasks/{task}/status', [TaskController::class, 'updateStatus']);
     Route::get( '/users/employees', [ UserController::class, 'employees', ] );
     Route::get('/employees', [ EmployeeController::class, 'index' ])->middleware('role:Admin');
+    Route::get('/employees/performance', [EmployeeController::class, 'performance'])->middleware('role:Admin');
 });
