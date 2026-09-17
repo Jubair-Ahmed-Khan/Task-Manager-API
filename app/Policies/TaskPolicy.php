@@ -44,4 +44,14 @@ class TaskPolicy
     {
         return $user->hasRole('Employee') && $task->assigned_to === $user->id;
     }
+
+    public function attach(User $user, Task $task): bool
+    {
+        if ($user->hasRole('Admin')) {
+            return true;
+        }
+
+        return $user->hasRole('Employee')
+            && $task->assigned_to === $user->id;
+    }
 }

@@ -97,6 +97,10 @@ class Task extends Model
             ->latest();
     }
 
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(TaskAttachment::class);
+    }
 
     /*
     |--------------------------------------------------------------------------

@@ -154,13 +154,14 @@ class TaskController extends Controller
     }
 
     // Show method to retrieve a specific task
-    public function show(Request $request, Task $task): JsonResponse 
+    public function show(Task $task): JsonResponse
     {
-
         $this->authorize('view', $task);
+
         $task->load([
             'assignee:id,name,email',
             'user:id,name,email',
+            'attachments.user:id,name,email',
         ]);
 
         return response()->json([

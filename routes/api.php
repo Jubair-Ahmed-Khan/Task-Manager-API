@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\TaskCommentController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\TaskAttachmentController; 
 
 
 Route::post('/register', [AuthController::class, 'register']);
@@ -30,4 +31,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get( '/users/employees', [ UserController::class, 'employees']);
     Route::get('/employees', [ EmployeeController::class, 'index' ])->middleware('role:Admin');
     Route::get('/employees/performance', [EmployeeController::class, 'performance'])->middleware('role:Admin');
+
+    Route::get('/tasks/{task}/attachments', [TaskAttachmentController::class, 'index']);
+    Route::post('/tasks/{task}/attachments', [TaskAttachmentController::class, 'store']);
+    Route::get('/task-attachments/{attachment}/download', [TaskAttachmentController::class, 'download']);
+    Route::delete('/task-attachments/{attachment}', [TaskAttachmentController::class, 'destroy']);
 });
