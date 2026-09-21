@@ -83,13 +83,22 @@ class TaskService
     }
 
     // Update an existing task with new data
-    public function updateTask(Task $task, array $data): Task 
+    // public function updateTask(Task $task, array $data): Task 
+    // {
+    //     $task->update($data);
+
+    //     return $task->fresh([
+    //         'assignee',
+    //         'user',
+    //     ]);
+    // }
+    public function updateTask(Task $task, array $data): Task
     {
         $task->update($data);
 
-        return $task->fresh([
-            'assignee',
-            'user',
+        return $task->load([
+            'assignee:id,name,email',
+            'user:id,name,email',
         ]);
     }
 
@@ -105,6 +114,7 @@ class TaskService
             'user',
         ]);
     }
+    
 
     // Delete a task and return the result
     public function deleteTask(Task $task): bool

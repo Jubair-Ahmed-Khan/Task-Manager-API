@@ -77,4 +77,9 @@ class User extends Authenticatable
         return $this->hasMany(TaskAttachment::class);
     }
 
+    public function taskActivities(): HasMany
+    {
+        return $this->hasMany(TaskActivity::class);
+    }
+
 }

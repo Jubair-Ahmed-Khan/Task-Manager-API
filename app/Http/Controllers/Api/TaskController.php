@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use App\Services\TaskService;
 use Illuminate\Http\JsonResponse;
 use App\Http\Controllers\Controller;
+use App\Services\TaskActivityService;
 use App\Http\Requests\StoreTaskRequest;
 use App\Http\Requests\UpdateTaskRequest;
 use App\Http\Requests\UpdateTaskStatusRequest;
@@ -141,10 +142,33 @@ class TaskController extends Controller
     }
 
     // Store method to create a new task
-    public function store(StoreTaskRequest $request, TaskService $taskService): JsonResponse 
-    {
+    // public function store(StoreTaskRequest $request, TaskService $taskService): JsonResponse 
+    // {
+    //     $this->authorize('create', Task::class);
+    //     $task = $taskService->createTask($request->validated(), $request->user());
+
+    //     return response()->json([
+    //         'success' => true,
+    //         'message' => 'Task created successfully.',
+    //         'data' => $task,
+    //     ], 201);
+    // }
+    public function store(
+        StoreTaskRequest $request,
+        TaskService $taskService,
+        TaskActivityService $activityService
+    ): JsonResponse {
         $this->authorize('create', Task::class);
-        $task = $taskService->createTask($request->validated(), $request->user());
+
+        $task = $taskService->createTask(
+            $request->validated(),
+            $request->user()
+        );
+
+        $activityService->created(
+            $task,
+            $request->user()
+        );
 
         return response()->json([
             'success' => true,
@@ -172,12 +196,116 @@ class TaskController extends Controller
     }
 
     // update method to update a specific task
-    public function update(UpdateTaskRequest $request, Task $task): JsonResponse 
-    {
+    // public function update(UpdateTaskRequest $request, Task $task): JsonResponse 
+    // {
 
+    //     $this->authorize('update', $task);
+    //     $task->update($request->validated());
+    //     $task->load('assignee:id,name,email');
+
+    //     return response()->json([
+    //         'success' => true,
+    //         'message' => 'Task updated successfully.',
+    //         'data' => $task,
+    //     ]);
+    // }
+    public function update(
+        UpdateTaskRequest $request,
+        Task $task,
+        TaskService $taskService,
+        TaskActivityService $activityService
+    ): JsonResponse {
         $this->authorize('update', $task);
-        $task->update($request->validated());
-        $task->load('assignee:id,name,email');
+
+        $user = $request->user();
+
+        $oldStatus = $task->status;
+        $oldPriority = $task->priority;
+        $oldAssignedTo = $task->assigned_to;
+
+        $validated = $request->validated();
+
+        $task = $taskService->updateTask(
+            $task,
+            $validated
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | General task update
+        |--------------------------------------------------------------------------
+        */
+
+        $generalChanges = collect([
+            'title',
+            'description',
+            'due_date',
+        ])->contains(
+            fn ($field) => array_key_exists($field, $validated)
+                && $task->wasChanged($field)
+        );
+
+        if ($generalChanges) {
+            $activityService->updated(
+                $task,
+                $user
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Status changed
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            array_key_exists('status', $validated)
+            && $oldStatus !== $task->status
+        ) {
+            $activityService->statusChanged(
+                $task,
+                $user,
+                $oldStatus,
+                $task->status
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Priority changed
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            array_key_exists('priority', $validated)
+            && $oldPriority !== $task->priority
+        ) {
+            $activityService->priorityChanged(
+                $task,
+                $user,
+                $oldPriority,
+                $task->priority
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Employee assignment changed
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            array_key_exists('assigned_to', $validated)
+            && $oldAssignedTo !== $task->assigned_to
+        ) {
+            $employeeName = $task->assignee?->name;
+
+            $activityService->assigned(
+                $task,
+                $user,
+                $employeeName
+            );
+        }
 
         return response()->json([
             'success' => true,
@@ -187,14 +315,46 @@ class TaskController extends Controller
     }
 
     // Update status method to update the status of a specific task
-    public function updateStatus(UpdateTaskStatusRequest $request, Task $task): JsonResponse 
-    {
+    // public function updateStatus(UpdateTaskStatusRequest $request, Task $task): JsonResponse 
+    // {
 
+    //     $this->authorize('updateStatus', $task);
+    //     $task->update([
+    //         'status' => $request->validated('status'),
+    //     ]);
+    //     $task->load('assignee:id,name,email');
+
+    //     return response()->json([
+    //         'success' => true,
+    //         'message' => 'Task status updated successfully.',
+    //         'data' => $task,
+    //     ]);
+    // }
+    public function updateStatus(
+        UpdateTaskStatusRequest $request,
+        Task $task,
+        TaskService $taskService,
+        TaskActivityService $activityService
+    ): JsonResponse {
         $this->authorize('updateStatus', $task);
-        $task->update([
-            'status' => $request->validated('status'),
-        ]);
-        $task->load('assignee:id,name,email');
+
+        $user = $request->user();
+
+        $oldStatus = $task->status;
+
+        $task = $taskService->updateStatus(
+            $task,
+            $request->validated()['status']
+        );
+
+        if ($oldStatus !== $task->status) {
+            $activityService->statusChanged(
+                $task,
+                $user,
+                $oldStatus,
+                $task->status
+            );
+        }
 
         return response()->json([
             'success' => true,
