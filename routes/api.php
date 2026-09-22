@@ -7,9 +7,9 @@ use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\TaskCommentController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\TaskActivityController;
+use App\Http\Controllers\TaskCategoryController;
 use App\Http\Controllers\Api\DashboardController;
-use App\Http\Controllers\TaskAttachmentController; 
-
+use App\Http\Controllers\TaskAttachmentController;
 
 
 Route::post('/register', [AuthController::class, 'register']);
@@ -17,10 +17,10 @@ Route::post('/login', [AuthController::class, 'login']);
 
 Route::middleware('auth:sanctum')->group(function () {
 
-    Route::middleware('role:Employee')->group(function () {
-        Route::patch('/tasks/{task}/status', [TaskController::class, 'updateStatus']);
+    // Route::middleware('role:Employee')->group(function () {
+    //     Route::patch('/tasks/{task}/status', [TaskController::class, 'updateStatus']);
 
-    });
+    // });
 
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'user']);
@@ -39,4 +39,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/task-attachments/{attachment}/download', [TaskAttachmentController::class, 'download']);
     Route::delete('/task-attachments/{attachment}', [TaskAttachmentController::class, 'destroy']);
     Route::get('/tasks/{task}/activities', [TaskActivityController::class, 'index']);
+
+    Route::get('/task-categories', [TaskCategoryController::class, 'index']);
+    Route::middleware('role:Admin')->group(function () {
+        Route::post('/task-categories', [TaskCategoryController::class, 'store']);
+        Route::get('/task-categories/{taskCategory}', [TaskCategoryController::class, 'show']);
+        Route::put('/task-categories/{taskCategory}', [TaskCategoryController::class, 'update']);
+        Route::delete('/task-categories/{taskCategory}', [TaskCategoryController::class, 'destroy']);
+    });
 });

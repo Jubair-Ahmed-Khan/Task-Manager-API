@@ -76,6 +76,22 @@ class TaskActivityService
         );
     }
 
+    public function categoryChanged(
+        Task $task,
+        User $user,
+        ?string $oldCategory,
+        ?string $newCategory
+    ): TaskActivity {
+        return $this->record(
+            task: $task,
+            user: $user,
+            action: 'category_changed',
+            description: "Category changed from {$oldCategory} to {$newCategory}",
+            oldValue: $oldCategory,
+            newValue: $newCategory
+        );
+    }
+
     private function record(
         Task $task,
         User $user,
@@ -92,4 +108,5 @@ class TaskActivityService
             'new_value' => $newValue,
         ]);
     }
+    
 }

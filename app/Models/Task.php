@@ -29,6 +29,7 @@ class Task extends Model
         'priority',
         'due_date',
         'assigned_to',
+        'category_id',
     ];
 
 
@@ -105,6 +106,14 @@ class Task extends Model
     public function activities(): HasMany
     {
         return $this->hasMany(TaskActivity::class)->latest();
+    }
+
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(
+            TaskCategory::class,
+            'category_id'
+        );
     }
     /*
     |--------------------------------------------------------------------------

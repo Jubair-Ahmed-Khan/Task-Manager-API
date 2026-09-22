@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Models\Task;
+use App\Models\TaskCategory;
 use Illuminate\Http\Request;
 use App\Services\TaskService;
 use Illuminate\Http\JsonResponse;
@@ -27,6 +28,7 @@ class TaskController extends Controller
             ->with([
                 'assignee:id,name,email',
                 'user:id,name,email',
+                'category:id,name,color',
             ])
             ->when(
                 $request->filled('search'),
@@ -65,6 +67,12 @@ class TaskController extends Controller
                         $request->priority
                     );
 
+                }
+            )
+            ->when(
+                $request->filled('category_id'),
+                function ($query) use ($request) {
+                    $query->where('category_id', $request->category_id);
                 }
             )
             ->when(
@@ -185,6 +193,8 @@ class TaskController extends Controller
         $task->load([
             'assignee:id,name,email',
             'user:id,name,email',
+            'category:id,name,color',
+            'comments.user:id,name,email',
             'attachments.user:id,name,email',
         ]);
 
@@ -222,6 +232,7 @@ class TaskController extends Controller
         $oldStatus = $task->status;
         $oldPriority = $task->priority;
         $oldAssignedTo = $task->assigned_to;
+        $oldCategoryId = $task->category_id;
 
         $validated = $request->validated();
 
@@ -275,6 +286,24 @@ class TaskController extends Controller
         | Priority changed
         |--------------------------------------------------------------------------
         */
+
+        if (
+            array_key_exists('category_id', $validated)
+            && $oldCategoryId !== $task->category_id
+        ) {
+            $oldCategoryName = $oldCategoryId
+                ? TaskCategory::find($oldCategoryId)?->name
+                : null;
+
+            $newCategoryName = $task->category?->name;
+
+            $activityService->categoryChanged(
+                $task,
+                $user,
+                $oldCategoryName,
+                $newCategoryName
+            );
+        }
 
         if (
             array_key_exists('priority', $validated)

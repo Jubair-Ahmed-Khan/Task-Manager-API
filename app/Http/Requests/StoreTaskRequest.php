@@ -39,6 +39,10 @@ class StoreTaskRequest extends FormRequest
                 'nullable',
                 'date',
             ],
+            'category_id' => [
+                'nullable',
+                'exists:task_categories,id',
+            ],
         ];
     }
 }
