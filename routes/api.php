@@ -4,13 +4,16 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\TaskController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\TaskCommentController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\TaskActivityController;
 use App\Http\Controllers\TaskCategoryController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\TaskProgressController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\TaskAttachmentController;
+use App\Http\Controllers\TaskTimeTrackingController;
 
 
 Route::post('/register', [AuthController::class, 'register']);
@@ -53,4 +56,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
     Route::patch('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
     Route::patch('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
+
+    Route::patch('/tasks/{id}/progress', [TaskProgressController::class, 'update']);
+
+    Route::post('/time-tracking/{id}/start', [TaskTimeTrackingController::class, 'start']);
+    Route::post('/time-tracking/{id}/stop', [TaskTimeTrackingController::class, 'stop']);
+    Route::get('/time-tracking/{id}/entries', [TaskTimeTrackingController::class, 'entries']);
+    Route::get('/time-tracking/{id}/summary', [TaskTimeTrackingController::class, 'summary']);
+
+    Route::get('/analytics/dashboard', [AnalyticsController::class, 'dashboard']);
 });

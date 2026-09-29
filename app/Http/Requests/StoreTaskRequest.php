@@ -43,6 +43,17 @@ class StoreTaskRequest extends FormRequest
                 'nullable',
                 'exists:task_categories,id',
             ],
+            'progress_percentage' => [
+                'sometimes',
+                'integer',
+                'min:0',
+                'max:100',
+            ],
+            'estimated_minutes' => [
+                'nullable',
+                'integer',
+                'min:1',
+            ],
         ];
     }
 }

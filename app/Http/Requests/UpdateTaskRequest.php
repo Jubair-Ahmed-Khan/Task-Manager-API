@@ -42,6 +42,18 @@ class UpdateTaskRequest extends FormRequest
                 'nullable',
                 'date',
             ],
+            'progress_percentage' => [
+                'sometimes',
+                'integer',
+                'min:0',
+                'max:100',
+            ],
+
+            'estimated_minutes' => [
+                'nullable',
+                'integer',
+                'min:1',
+            ],
         ];
     }
 }

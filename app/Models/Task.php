@@ -30,6 +30,8 @@ class Task extends Model
         'due_date',
         'assigned_to',
         'category_id',
+        'progress_percentage',
+        'estimated_minutes',
     ];
 
 
@@ -53,6 +55,8 @@ class Task extends Model
 
     protected $casts = [
         'due_date' => 'date:Y-m-d',
+        'progress_percentage' => 'integer',
+        'estimated_minutes' => 'integer',
     ];
 
 
@@ -90,6 +94,11 @@ class Task extends Model
             User::class,
             'assigned_to'
         );
+    }
+
+    public function timeEntries()
+    {
+        return $this->hasMany(TaskTimeEntry::class);
     }
 
     public function comments(): HasMany
