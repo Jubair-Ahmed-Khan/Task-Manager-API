@@ -2,27 +2,29 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Models\Task;
-use App\Models\TaskCategory;
-use Illuminate\Http\Request;
-use App\Services\TaskService;
-use Illuminate\Http\JsonResponse;
 use App\Http\Controllers\Controller;
-use App\Services\TaskActivityService;
 use App\Http\Requests\StoreTaskRequest;
 use App\Http\Requests\UpdateTaskRequest;
 use App\Http\Requests\UpdateTaskStatusRequest;
-
-
+use App\Models\Task;
+use App\Models\TaskCategory;
+use App\Notifications\TaskNotification;
+use App\Services\TaskActivityService;
+use App\Services\TaskService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class TaskController extends Controller
 {
-
-    //index method to list all tasks with filters and pagination
+    /**
+     * List tasks with filters and pagination.
+     */
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
+
         $this->authorize('viewAny', Task::class);
+
         $tasks = Task::query()
             ->visibleTo($user)
             ->with([
@@ -34,13 +36,9 @@ class TaskController extends Controller
                 $request->filled('search'),
                 function ($query) use ($request) {
                     $search = $request->search;
+
                     $query->where(function ($query) use ($search) {
-                        $query
-                            ->where(
-                                'title',
-                                'like',
-                                "%{$search}%"
-                            )
+                        $query->where('title', 'like', "%{$search}%")
                             ->orWhere(
                                 'description',
                                 'like',
@@ -52,21 +50,13 @@ class TaskController extends Controller
             ->when(
                 $request->filled('status'),
                 function ($query) use ($request) {
-                    $query->where(
-                        'status',
-                        $request->status
-                    );
-
+                    $query->where('status', $request->status);
                 }
             )
             ->when(
                 $request->filled('priority'),
                 function ($query) use ($request) {
-                    $query->where(
-                        'priority',
-                        $request->priority
-                    );
-
+                    $query->where('priority', $request->priority);
                 }
             )
             ->when(
@@ -80,66 +70,42 @@ class TaskController extends Controller
                 function ($query) use ($request) {
 
                     if ($request->due_status === 'overdue') {
-
-                        $query
-                            ->whereNotNull('due_date')
+                        $query->whereNotNull('due_date')
                             ->whereDate('due_date', '<', today())
                             ->where('status', '!=', 'completed');
-
                     }
 
                     if ($request->due_status === 'due_soon') {
-
-                        $query
-                            ->whereNotNull('due_date')
-                            ->whereBetween(
-                                'due_date',
-                                [
-                                    today(),
-                                    today()->copy()->addDays(3),
-                                ]
-                            )
+                        $query->whereNotNull('due_date')
+                            ->whereBetween('due_date', [
+                                today(),
+                                today()->copy()->addDays(3),
+                            ])
                             ->where('status', '!=', 'completed');
-
                     }
-
                 }
             )
             ->when(
                 $user->hasRole('Admin')
-                && $request->filled('assigned_to'),
+                    && $request->filled('assigned_to'),
                 function ($query) use ($request) {
                     $query->where(
                         'assigned_to',
                         $request->assigned_to
                     );
-
                 }
             )
             ->when(
-            $request->boolean('overdue'),
+                $request->boolean('overdue'),
                 function ($query) {
-
-                    $query
-                        ->whereNotNull('due_date')
-                        ->whereDate(
-                            'due_date',
-                            '<',
-                            now()->toDateString()
-                        )
-                        ->where(
-                            'status',
-                            '!=',
-                            'completed'
-                        );
+                    $query->whereNotNull('due_date')
+                        ->whereDate('due_date', '<', now()->toDateString())
+                        ->where('status', '!=', 'completed');
                 }
             )
             ->latest()
             ->paginate(
-                $request->integer(
-                    'per_page',
-                    10
-                )
+                $request->integer('per_page', 10)
             );
 
         return response()->json([
@@ -149,34 +115,58 @@ class TaskController extends Controller
         ]);
     }
 
-    // Store method to create a new task
-    // public function store(StoreTaskRequest $request, TaskService $taskService): JsonResponse 
-    // {
-    //     $this->authorize('create', Task::class);
-    //     $task = $taskService->createTask($request->validated(), $request->user());
-
-    //     return response()->json([
-    //         'success' => true,
-    //         'message' => 'Task created successfully.',
-    //         'data' => $task,
-    //     ], 201);
-    // }
+    /**
+     * Create a task.
+     *
+     * Notify the assigned employee when a task is created.
+     */
     public function store(
         StoreTaskRequest $request,
         TaskService $taskService,
         TaskActivityService $activityService
     ): JsonResponse {
+
         $this->authorize('create', Task::class);
+
+        $user = $request->user();
 
         $task = $taskService->createTask(
             $request->validated(),
-            $request->user()
+            $user
         );
 
+        // Record task creation activity.
         $activityService->created(
             $task,
-            $request->user()
+            $user
         );
+
+        // Notify assigned employee.
+        if ($task->assigned_to) {
+
+            $assignee = $task->assignee;
+
+            if ($assignee && $assignee->id !== $user->id) {
+
+                $message = $user->name
+                    . ' assigned you a task: '
+                    . $task->title;
+
+                $this->sendTaskNotification(
+                    $assignee,
+                    $task,
+                    $user,
+                    'task_assigned',
+                    $message
+                );
+            }
+        }
+
+        $task->load([
+            'assignee:id,name,email',
+            'user:id,name,email',
+            'category:id,name,color',
+        ]);
 
         return response()->json([
             'success' => true,
@@ -185,7 +175,9 @@ class TaskController extends Controller
         ], 201);
     }
 
-    // Show method to retrieve a specific task
+    /**
+     * Retrieve a specific task.
+     */
     public function show(Task $task): JsonResponse
     {
         $this->authorize('view', $task);
@@ -205,30 +197,25 @@ class TaskController extends Controller
         ]);
     }
 
-    // update method to update a specific task
-    // public function update(UpdateTaskRequest $request, Task $task): JsonResponse 
-    // {
-
-    //     $this->authorize('update', $task);
-    //     $task->update($request->validated());
-    //     $task->load('assignee:id,name,email');
-
-    //     return response()->json([
-    //         'success' => true,
-    //         'message' => 'Task updated successfully.',
-    //         'data' => $task,
-    //     ]);
-    // }
+    /**
+     * Update a task.
+     *
+     * Notifications:
+     * - Notify the new employee when assigned or reassigned.
+     * - Record task field changes in activity history.
+     */
     public function update(
         UpdateTaskRequest $request,
         Task $task,
         TaskService $taskService,
         TaskActivityService $activityService
     ): JsonResponse {
+
         $this->authorize('update', $task);
 
         $user = $request->user();
 
+        // Capture old values before updating.
         $oldStatus = $task->status;
         $oldPriority = $task->priority;
         $oldAssignedTo = $task->assigned_to;
@@ -252,7 +239,8 @@ class TaskController extends Controller
             'description',
             'due_date',
         ])->contains(
-            fn ($field) => array_key_exists($field, $validated)
+            fn ($field) =>
+                array_key_exists($field, $validated)
                 && $task->wasChanged($field)
         );
 
@@ -279,17 +267,27 @@ class TaskController extends Controller
                 $oldStatus,
                 $task->status
             );
+
+            // Notify the task creator about status changes.
+            $this->notifyTaskCreator(
+                $task,
+                $user,
+                'status_updated',
+                $user->name
+                    . ' updated the status of: '
+                    . $task->title
+            );
         }
 
         /*
         |--------------------------------------------------------------------------
-        | Priority changed
+        | Category changed
         |--------------------------------------------------------------------------
         */
 
         if (
             array_key_exists('category_id', $validated)
-            && $oldCategoryId !== $task->category_id
+            && $oldCategoryId != $task->category_id
         ) {
             $oldCategoryName = $oldCategoryId
                 ? TaskCategory::find($oldCategoryId)?->name
@@ -304,6 +302,12 @@ class TaskController extends Controller
                 $newCategoryName
             );
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Priority changed
+        |--------------------------------------------------------------------------
+        */
 
         if (
             array_key_exists('priority', $validated)
@@ -325,7 +329,7 @@ class TaskController extends Controller
 
         if (
             array_key_exists('assigned_to', $validated)
-            && $oldAssignedTo !== $task->assigned_to
+            && $oldAssignedTo != $task->assigned_to
         ) {
             $employeeName = $task->assignee?->name;
 
@@ -334,7 +338,34 @@ class TaskController extends Controller
                 $user,
                 $employeeName
             );
+
+            // Notify the newly assigned employee.
+            if ($task->assigned_to) {
+
+                $assignee = $task->assignee;
+
+                if ($assignee && $assignee->id !== $user->id) {
+
+                    $message = $user->name
+                        . ' assigned you a task: '
+                        . $task->title;
+
+                    $this->sendTaskNotification(
+                        $assignee,
+                        $task,
+                        $user,
+                        'task_assigned',
+                        $message
+                    );
+                }
+            }
         }
+
+        $task->load([
+            'assignee:id,name,email',
+            'user:id,name,email',
+            'category:id,name,color',
+        ]);
 
         return response()->json([
             'success' => true,
@@ -343,28 +374,18 @@ class TaskController extends Controller
         ]);
     }
 
-    // Update status method to update the status of a specific task
-    // public function updateStatus(UpdateTaskStatusRequest $request, Task $task): JsonResponse 
-    // {
-
-    //     $this->authorize('updateStatus', $task);
-    //     $task->update([
-    //         'status' => $request->validated('status'),
-    //     ]);
-    //     $task->load('assignee:id,name,email');
-
-    //     return response()->json([
-    //         'success' => true,
-    //         'message' => 'Task status updated successfully.',
-    //         'data' => $task,
-    //     ]);
-    // }
+    /**
+     * Update task status.
+     *
+     * Notify the task creator when the status changes.
+     */
     public function updateStatus(
         UpdateTaskStatusRequest $request,
         Task $task,
         TaskService $taskService,
         TaskActivityService $activityService
     ): JsonResponse {
+
         $this->authorize('updateStatus', $task);
 
         $user = $request->user();
@@ -377,13 +398,30 @@ class TaskController extends Controller
         );
 
         if ($oldStatus !== $task->status) {
+
             $activityService->statusChanged(
                 $task,
                 $user,
                 $oldStatus,
                 $task->status
             );
+
+            // Notify the task creator.
+            $this->notifyTaskCreator(
+                $task,
+                $user,
+                'status_updated',
+                $user->name
+                    . ' updated the status of: '
+                    . $task->title
+            );
         }
+
+        $task->load([
+            'assignee:id,name,email',
+            'user:id,name,email',
+            'category:id,name,color',
+        ]);
 
         return response()->json([
             'success' => true,
@@ -392,16 +430,73 @@ class TaskController extends Controller
         ]);
     }
 
-    //delete method to delete a specific task
-    public function destroy(Request $request, Task $task): JsonResponse 
-    {
+    /**
+     * Delete a task.
+     */
+    public function destroy(
+        Request $request,
+        Task $task
+    ): JsonResponse {
 
         $this->authorize('delete', $task);
+
         $task->delete();
 
         return response()->json([
             'success' => true,
             'message' => 'Task deleted successfully.',
         ]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Notification helper methods
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Send a database notification to a user.
+     */
+    private function sendTaskNotification(
+        $recipient,
+        Task $task,
+        $actor,
+        string $action,
+        string $message
+    ): void {
+
+        $recipient->notify(
+            new TaskNotification(
+                $task,
+                $actor,
+                $action,
+                $message
+            )
+        );
+    }
+
+    /**
+     * Notify the task creator, excluding the person
+     * who performed the action.
+     */
+    private function notifyTaskCreator(
+        Task $task,
+        $actor,
+        string $action,
+        string $message
+    ): void {
+
+        $creator = $task->user;
+
+        if ($creator && $creator->id !== $actor->id) {
+
+            $this->sendTaskNotification(
+                $creator,
+                $task,
+                $actor,
+                $action,
+                $message
+            );
+        }
     }
 }

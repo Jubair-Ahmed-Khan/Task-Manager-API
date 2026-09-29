@@ -8,6 +8,7 @@ use App\Http\Controllers\TaskCommentController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\TaskActivityController;
 use App\Http\Controllers\TaskCategoryController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\TaskAttachmentController;
 
@@ -47,4 +48,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/task-categories/{taskCategory}', [TaskCategoryController::class, 'update']);
         Route::delete('/task-categories/{taskCategory}', [TaskCategoryController::class, 'destroy']);
     });
+
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
+    Route::patch('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
+    Route::patch('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
 });
